@@ -7,13 +7,21 @@
     "outDir": "dist",
     "baseUrl": "src/",
     "sourceMap": true,
-    "strict": true,
+    "strict": false,
     "experimentalDecorators": true,
     "noImplicitReturns": true,
     "allowSyntheticDefaultImports": true,
-    "allowUnreachableCode": false
+    "allowUnreachableCode": false,
+    "strictPropertyInitialization": false,
+    "paths": {
+      "@/*": ["./src/*"]
+    },
   },
-  "exclude": [
-    "node_modules"
+  // "exclude": [
+  //   "node_modules"
+  // ],
+  "include": [
+    "./src/**/*.ts",
+    "./src/**/*.d.ts"
   ]
 }
