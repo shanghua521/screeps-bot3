@@ -1,5 +1,3 @@
-import { off } from "process";
-
 export class MyRoom extends Room {
 
   // 建筑信息
@@ -37,12 +35,27 @@ export class MyRoom extends Room {
   public mineral: Mineral
   public extractor: StructureExtractor
   public mineralContainer: StructureContainer
+  public sourceLinks: StructureLink[];
+  public factory:StructureFactory
 
   constructor(public room: Room) {
     super(room.name);
     this.controller = room.controller
     this.storage = room.storage
     this.terminal = room.terminal
+
+    if ((this.controller && this.controller.owner == null) || (this.controller && this.controller.reservation && this.controller.reservation.username == 'shanghua')) {
+      this.initStructureData()
+      this.initSourceData()
+      this.initHarvesterData()
+      this.initInvader()
+      this.initContainerData()
+
+      this.memory.structureIdData = this.structureData
+      return
+    }
+
+    this.initLink()
 
     this.initStructureData()
     this.initSourceData()
@@ -53,19 +66,27 @@ export class MyRoom extends Room {
     this.initAllSource()
     this.initAllTarget()
     this.initAllConstruction()
+    this.initFactory()
 
-    this.initLink()
+    this.initContainerData()
 
     this.initTowers()
-
     this.initNeedRepairWallAndRampart()
-
     this.initMineral()
-
-
     this.initInvader()
 
     this.memory.structureIdData = this.structureData
+  }
+
+  private initFactory() {
+    let factory = this.find(FIND_MY_STRUCTURES, {
+      filter: (structure) => {
+        return structure.structureType == STRUCTURE_FACTORY && structure.store.getFreeCapacity(RESOURCE_ENERGY) > 2000
+      }
+    })
+    if (factory && factory.length > 0) {
+      this.factory = factory[0] as StructureFactory
+    }
   }
 
   private initInvader() {
@@ -111,6 +132,8 @@ export class MyRoom extends Room {
   }
 
   private initLink() {
+    let allLink = this.find(FIND_STRUCTURES, { filter: (structure) => structure.structureType == STRUCTURE_LINK && structure.cooldown == 0 && structure.store.getFreeCapacity(RESOURCE_ENERGY) <= 0 }) as StructureLink[]
+
     if (this.memory.controllerLinkId) {
       this.controllerLink = Game.getObjectById(this.memory.controllerLinkId)
     }
@@ -133,6 +156,13 @@ export class MyRoom extends Room {
         this.memory.storageLinkId = this.storageLink.id
       }
     }
+    if (this.storageLink) {
+      _.remove(allLink, link => link.id == this.storageLink.id)
+    }
+    if (this.controllerLink) {
+      _.remove(allLink, link => link.id == this.controllerLink.id)
+    }
+    this.sourceLinks = allLink
   }
 
   private initAllConstruction() {
@@ -151,8 +181,24 @@ export class MyRoom extends Room {
     let tombstones = this.find(FIND_TOMBSTONES, {
       filter: (tombstone) => tombstone.store.getUsedCapacity(RESOURCE_ENERGY) > 0
     })
+
+    let ruins = this.find(FIND_RUINS, {
+      filter: (ruin) => ruin.store.getUsedCapacity(RESOURCE_ENERGY) > 0
+    })
+
+    // storageLink 加入 source
+    let storageLink = this.storageLink
+    if (storageLink && storageLink.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+      allSource.push(storageLink)
+    }
+    let terminal = this.terminal
+    if (terminal && terminal.pos.lookFor(LOOK_FLAGS).length == 0 && terminal.store.getUsedCapacity(RESOURCE_ENERGY) > 5000) {
+      allSource.push(terminal)
+    }
     allSource.push(...containers)
     allSource.push(...tombstones)
+    allSource.push(...ruins)
+
 
     // allSource.push(...droppedResources)
     this.allSource = allSource
@@ -175,21 +221,22 @@ export class MyRoom extends Room {
     // 所有的 towers
     let towers = this.find(FIND_STRUCTURES, {
       filter: (structure) => {
-        return (structure.structureType == STRUCTURE_TOWER && structure.store.getFreeCapacity(RESOURCE_ENERGY) > 0)
+        return (structure.structureType == STRUCTURE_TOWER && structure.store.getFreeCapacity(RESOURCE_ENERGY) > 200)
       }
     })
 
-    // storage 旁边的 link 也要填满
-    let storageLinkId = this.memory.storageLinkId
-    let storageLink: StructureLink | null
-    if (storageLinkId && (storageLink = Game.getObjectById(storageLinkId))) {
-      if (storageLink.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
-        allTarget.push(storageLink)
+    let labs = this.find(FIND_STRUCTURES, {
+      filter: (structure) => {
+        return (structure.structureType == STRUCTURE_LAB && structure.store.getFreeCapacity(RESOURCE_ENERGY) > 0)
       }
-    }
+    })
+
+
+    // storage 旁边的 link 也要填满
     allTarget.push(...towers)
     allTarget.push(...spawns)
     allTarget.push(...extensions)
+    allTarget.push(...labs)
     this.allTarget = allTarget
   }
 
@@ -215,6 +262,28 @@ export class MyRoom extends Room {
     sources.forEach((source => sourceData.push(source.id)))
     this.sourceData = sourceData
     this.structureData.sourceData = sourceData
+  }
+
+  // 初始化 container 信息
+  private initContainerData() {
+    let containers = this.find(FIND_STRUCTURES, { filter: (structure) => structure.structureType == STRUCTURE_CONTAINER })
+    let containerData = this.memory.containerData;
+    if (!containerData) containerData = {}
+    for (let container of containers) {
+      if (!containerData[container.id]) {
+        containerData[container.id] = {outCarry: [], num: 2}
+      } else {
+        let oneContainerData = containerData[container.id];
+        _.remove(oneContainerData.outCarry, creep => Game.getObjectById(creep) == null);
+        containerData[container.id] = oneContainerData
+      }
+    }
+    for (let oneContainerData in containerData) {
+      if (Game.getObjectById(oneContainerData as Id<StructureContainer>) == null) {
+        delete containerData[oneContainerData]
+      }
+    }
+    this.memory.containerData = containerData
   }
 
   // 初始化 source 矿工信息
@@ -275,4 +344,11 @@ interface HarvesterData {
 interface StructureData {
   sourceData?: any
   harvesterData?: HarvesterData
+}
+
+interface ContainerData {
+  [containerId: string]: {
+    outCarry?: Id<Creep>[]
+    num?: 2
+  }
 }

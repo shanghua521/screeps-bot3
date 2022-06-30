@@ -55,7 +55,10 @@ interface CreepMemory {
   // 是否站立不动
   standee?: boolean
 
-  collectRubbishMode?:boolean
+  collectRubbishMode?: boolean
+
+  // 房间索引
+  roomIndex?:number
 }
 
 interface Memory {
@@ -97,7 +100,9 @@ interface RoomMemory {
   hasInvader: boolean
 
   // 入侵者死亡时间
-  invaderDealTime:number
+  invaderDealTime: number
+
+  containerData: ContainerData
 }
 interface RoomTerrain {
   getRawBuffer: () => number[]
@@ -106,5 +111,27 @@ interface RoomTerrain {
 declare module NodeJS {
   interface Global {
     routeCache:{}
+  }
+}
+
+interface HarvesterData {
+  [sourceId: string]: {
+    containerId?: Id<StructureContainer>,
+    linkId?: Id<StructureLink>,
+    // 一个框可以被多个挖矿的挖
+    harvesters?: Id<Creep>[]
+    num?: 1
+  }
+}
+
+interface StructureData {
+  sourceData?: any
+  harvesterData?: HarvesterData
+}
+
+interface ContainerData {
+  [containerId: string]: {
+    outCarry?: Id<Creep>[]
+    num?: 2
   }
 }

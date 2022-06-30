@@ -33,6 +33,9 @@ export default class TowerTask {
   }
 
   public run() {
+    if (this.myRoom.controller.owner == null) {
+      return
+    }
     var hostiles = this.myRoom.find(FIND_HOSTILE_CREEPS);
     if (hostiles.length > 0) {
       this.defendRoom(hostiles)

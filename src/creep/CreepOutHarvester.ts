@@ -13,23 +13,42 @@ export default class CreepOutHarvester extends CreepHarvester {
     if (toRoom && toRoom.hasInvader && toRoom.invaderDealTime > Game.time) {
       // 有入侵者并且还没死，去撤离点
       let flag = Game.flags[`leave${this.toRoomName}`]
-      if (!this.pos.isNearTo(flag)) {
+      if (flag && !this.pos.isNearTo(flag)) {
         this.goTo(flag.pos)
         this.memory.standee = false
       } else {
         this.memory.standee = true
       }
       // 查询是否健康，不健康了就发送信息，让派人过来
-      if (!this.isHealthy() && !this.memory.hasSendRebirth) {
-        this.sendRebirthInfo()
+      if ((!this.isHealthy() || this.hits != this.hitsMax) && !this.memory.hasSendRebirth) {
+        this.sendRebirthInfo(toRoom.invaderDealTime)
         // 把自己从占用删掉
         let toRoomMemory = Memory.rooms[this.toRoomName]
-        _.remove(toRoomMemory.structureIdData.harvesterData[this.currentSource.id].harvesters, (harvesterId) => harvesterId == this.id)
+        if (this.currentSource &&this.currentSource.id) {
+          _.remove(toRoomMemory.structureIdData.harvesterData[this.currentSource.id].harvesters, (harvesterId) => harvesterId == this.id)
+        }
       }
       return
     }
+
+    // 查询是否健康，不健康了就发送信息，让派人过来
+    if (!this.isHealthy() && !this.memory.hasSendRebirth) {
+      this.sendRebirthInfo()
+      // 把自己从占用删掉
+      let toRoomMemory = Memory.rooms[this.toRoomName]
+      if (this.currentSource && this.currentSource.id) {
+        _.remove(toRoomMemory.structureIdData.harvesterData[this.currentSource.id].harvesters, (harvesterId) => harvesterId == this.id)
+      }
+    }
+
+    // 如果收到伤害，说明有入侵者
+    if (this.hits != this.hitsMax && !this.memory.hasSendRebirth) {
+      // 发送重生消息，1500 tick 后再产生我
+      this.sendRebirthInfo(Game.time + 1500)
+    }
+
     // 判断是否在我要工作的房间
-    if (this.isInRightRoom()) {
+    if (this.memory.sourceId || this.isInRightRoom()) {
       this.initSource()
     } else {
       // isInRightRoom 会自动往 目标房间前进
@@ -45,12 +64,6 @@ export default class CreepOutHarvester extends CreepHarvester {
     }
     // 切换状态
     if (this.stateChange) this.memory.working = !this.memory.working
-    // 查询是否健康，不健康了就发送信息，让派人过来
-    if (!this.isHealthy() && !this.memory.hasSendRebirth) {
-      this.sendRebirthInfo()
-      // 把自己从占用删掉
-      let toRoomMemory = Memory.rooms[this.toRoomName]
-      _.remove(toRoomMemory.structureIdData.harvesterData[this.currentSource.id].harvesters, (harvesterId) => harvesterId == this.id)
-    }
+
   }
 }

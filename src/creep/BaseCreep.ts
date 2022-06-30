@@ -28,12 +28,17 @@ export default class BaseCreep extends Creep implements CreepLifeCycle {
   }
 
   public isHealthy(tickToDie?: number) {
-    if(!this.ticksToLive)return true
+    if(this.ticksToLive == undefined)return true
     if (!tickToDie) tickToDie = 50
     return this.ticksToLive > tickToDie
   }
 
   public work() { }
+
+  // 是否在地图边缘
+  public isOnEdge() {
+    return this.pos.x == 0 || this.pos.x == 49 || this.pos.y == 0 || this.pos.y == 49
+  }
 
   // 是否在自己应该在的房间
   public isInRightRoom() {
@@ -60,7 +65,7 @@ export default class BaseCreep extends Creep implements CreepLifeCycle {
 
   public sendRebirthInfo(rebirthTime?:number) {
     // 需要先判断当前房间是否有生产我的条件，有 spawn
-    let spawns = this.room.find(FIND_STRUCTURES, { filter: { structureType: STRUCTURE_SPAWN } })
+    let spawns = this.room.find(FIND_MY_SPAWNS)
     // 生成我就不能仅仅添加一个 role，还需要添加我的目标房间
     let reBirthInfo: {
       role: string
@@ -106,11 +111,15 @@ export default class BaseCreep extends Creep implements CreepLifeCycle {
     if (!this.memory.moveData.path) {
       this.memory.moveData.path = this.findPath(target, range, ops);
     }
+    // if (this.memory.role == 'tough') {
+    //   console.log(this.memory.moveData.path)
+    // }
     // 还是空就是没找到路径
     if (!this.memory.moveData.path) {
       delete this.memory.moveData.path
       return ERR_NO_PATH
     }
+
     // 使用缓存移动
     const goResult = this.goByPath()
     if (goResult != OK && goResult != ERR_TIRED) {
@@ -184,7 +193,9 @@ export default class BaseCreep extends Creep implements CreepLifeCycle {
       // 当前房间 1.2 cpu，其他房间 8 cpu
       maxOps: ops ? ops : (target.roomName == this.room.name) ? 1200 : 8000,
       roomCallback: roomName => {
-
+        if (roomName === 'W23S24') {
+          return false
+        }
         const room = Game.rooms[roomName]
         // 没有视野的房间
         if (!room) return false

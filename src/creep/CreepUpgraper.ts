@@ -43,7 +43,7 @@ export default class CreepUpgrader extends BaseCreep {
   public target() {
     let target = this.myRoom.controller
     if (this.upgradeController(target) == ERR_NOT_IN_RANGE) {
-      this.goTo(target.pos)
+      this.goTo(target.pos,3)
       this.memory.standee = false
     } else {
       this.memory.standee = true

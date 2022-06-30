@@ -7,9 +7,12 @@ export default class LinkTask {
   public run() {
     let storageLink = this.room.storageLink
     let controllerLink = this.room.controllerLink
-    if (storageLink && controllerLink) {
-      if (storageLink.store.getFreeCapacity(RESOURCE_ENERGY) == 0 && storageLink.cooldown == 0 && controllerLink.store.getUsedCapacity(RESOURCE_ENERGY) <= 300) {
-        storageLink.transferEnergy(controllerLink)
+    let sourceLinks = this.room.sourceLinks
+    for (let sourceLink of sourceLinks) {
+      if (controllerLink && controllerLink.store.getUsedCapacity(RESOURCE_ENERGY) == 0) {
+        sourceLink.transferEnergy(controllerLink)
+      } else if (storageLink && storageLink.store.getUsedCapacity(RESOURCE_ENERGY) == 0) {
+        sourceLink.transferEnergy(storageLink)
       }
     }
   }

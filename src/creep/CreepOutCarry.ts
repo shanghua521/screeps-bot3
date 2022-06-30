@@ -5,27 +5,58 @@ export default class CreepOutCarry extends BaseCreep {
   private working: boolean
   private stateChange: boolean
 
+  private currentContainer: Id<StructureContainer>;
+
   constructor(creep: Creep, public myRoom: MyRoom) {
     super(creep)
+    this.currentContainer = this.memory.currentContainer
     this.working = this.memory.working
   }
 
   public source() {
-    if (this.myRoom.name != this.toRoomName) {
-      let roomPosition = new RoomPosition(25, 25, this.toRoomName)
-      this.goTo(roomPosition)
-      this.memory.standee = false
-      return false
+    if (this.currentContainer) {
+      let container = Game.getObjectById(this.currentContainer);
+      if (container && this.withdraw(container, RESOURCE_ENERGY) == ERR_NOT_IN_RANGE) {
+        this.goTo(container.pos)
+      }
+      if (container) return this.store.getFreeCapacity() <= 0
     }
+    // 如果不在目标房间，去往目标房间
+    if (this.myRoom.name != this.toRoomName) {
+      let toRoom = Game.rooms[this.toRoomName];
+      if (!toRoom) {
+        let roomPosition = new RoomPosition(25, 25, this.toRoomName)
+        this.goTo(roomPosition)
+        this.memory.standee = false
+        return false
+      } else {
+        let containers = toRoom.find(FIND_STRUCTURES, {
+          filter: (structure) => {
+            return structure.structureType == STRUCTURE_CONTAINER && structure.store.getUsedCapacity(RESOURCE_ENERGY) > 200;
+          }
+        })
 
+
+        if (containers.length > 0) {
+          if (this.withdraw(containers[0], RESOURCE_ENERGY) == ERR_NOT_IN_RANGE) {
+            this.goTo(containers[0].pos)
+            this.memory.standee = false
+          } else {
+            this.memory.standee = true
+          }
+          return this.store.getFreeCapacity() <= 0
+        }
+      }
+    }
     let containers = this.myRoom.find(FIND_STRUCTURES, {
       filter: (structure) => {
-        return structure.structureType == STRUCTURE_CONTAINER
+        return structure.structureType == STRUCTURE_CONTAINER && structure.store.getUsedCapacity(RESOURCE_ENERGY) > 200;
       }
     })
     if (containers.length > 0) {
-      if (this.withdraw(containers[0], RESOURCE_ENERGY) == ERR_NOT_IN_RANGE) {
-        this.goTo(containers[0].pos)
+      let container = this.pos.findClosestByRange(containers);
+      if (this.withdraw(container, RESOURCE_ENERGY) == ERR_NOT_IN_RANGE) {
+        this.goTo(container.pos)
         this.memory.standee = false
       } else {
         this.memory.standee = true
@@ -52,7 +83,7 @@ export default class CreepOutCarry extends BaseCreep {
       }
 
       // 再造路
-      let roadConstructions = this.myRoom.find(FIND_CONSTRUCTION_SITES)
+      let roadConstructions = this.myRoom.find(FIND_MY_CONSTRUCTION_SITES);
       if (roadConstructions.length > 0) {
         let construction = this.pos.findClosestByRange(FIND_CONSTRUCTION_SITES)
         if (this.build(construction) == ERR_NOT_IN_RANGE) {
@@ -65,35 +96,33 @@ export default class CreepOutCarry extends BaseCreep {
       }
     }
     if (this.myRoom.name != this.fromRoomName) {
-      let roomPosition = new RoomPosition(25, 25, this.fromRoomName)
-      this.goTo(roomPosition)
-      this.memory.standee = false
-      return this.store.getUsedCapacity(RESOURCE_ENERGY) <= 0
+      const fromRoom = Game.rooms[this.fromRoomName];
+      if (fromRoom) {
+        if (fromRoom.storage) {
+          if (this.transfer(fromRoom.storage, RESOURCE_ENERGY) == ERR_NOT_IN_RANGE) {
+            this.goTo(fromRoom.storage.pos)
+            this.memory.standee = false
+          } else {
+            this.memory.standee = true
+          }
+          return this.store.getUsedCapacity(RESOURCE_ENERGY) <= 0
+        }
+      } else {
+        let roomPosition = new RoomPosition(25, 25, this.fromRoomName)
+        this.goTo(roomPosition)
+        this.memory.standee = false
+        return this.store.getUsedCapacity(RESOURCE_ENERGY) <= 0
+      }
     }
     if (this.myRoom.storage) {
       if (this.transfer(this.myRoom.storage, RESOURCE_ENERGY) == ERR_NOT_IN_RANGE) {
         this.goTo(this.myRoom.storage.pos)
         this.memory.standee = false
-        return this.store.getUsedCapacity(RESOURCE_ENERGY) <= 0
       } else {
         this.memory.standee = true
       }
+      return this.store.getUsedCapacity(RESOURCE_ENERGY) <= 0
     }
-    let containers = this.myRoom.find(FIND_STRUCTURES, {
-      filter: (structure) => {
-        return structure.structureType == STRUCTURE_CONTAINER
-      }
-    })
-    if (containers.length > 0) {
-      if (this.transfer(containers[0], RESOURCE_ENERGY) == ERR_NOT_IN_RANGE) {
-        this.goTo(containers[0].pos)
-        this.memory.standee = false
-        return this.store.getUsedCapacity(RESOURCE_ENERGY) <= 0
-      } else {
-        this.memory.standee = true
-      }
-    }
-
     return this.store.getUsedCapacity(RESOURCE_ENERGY) <= 0
   }
 
@@ -115,6 +144,13 @@ export default class CreepOutCarry extends BaseCreep {
       }
       return
     }
+
+    // 如果收到伤害，说明有入侵者
+    if (this.hits != this.hitsMax && !this.memory.hasSendRebirth) {
+      // 发送重生消息，1500 tick 后再产生我
+      this.sendRebirthInfo(Game.time + 1500)
+    }
+
     // 如果正在工作
     if (this.working) {
       // 执行 target 代码逻辑

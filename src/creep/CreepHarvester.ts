@@ -74,6 +74,14 @@ export default class CreepHarvester extends BaseCreep {
   }
 
   public target(): boolean {
+    // 先填 link
+    let links = this.pos.findInRange(FIND_STRUCTURES, 1, { filter: (structure) => structure.structureType == STRUCTURE_LINK && structure as StructureLink && structure.store.getFreeCapacity(RESOURCE_ENERGY) > 0 });
+    if (links && links.length > 0) {
+      if (this.transfer(links[0], RESOURCE_ENERGY) == ERR_NOT_IN_RANGE) {
+        this.goTo(links[0].pos)
+      }
+      return this.store[RESOURCE_ENERGY] <= 0
+    }
     // 先填 container
     if (this.currentContainer) {
       // 先修
@@ -90,11 +98,13 @@ export default class CreepHarvester extends BaseCreep {
       }
       return this.store[RESOURCE_ENERGY] <= 0
     }
-    // 没有就修建筑工地
-    let constructionSite = this.pos.findInRange(FIND_MY_CONSTRUCTION_SITES, 3)
-    if (constructionSite && constructionSite.length > 0) this.build(constructionSite[0])
-    // 没有建筑工地就创建一个
-    else this.pos.createConstructionSite(STRUCTURE_CONTAINER)
+    if (!links || links.length == 0) {
+      // 没有就修建筑工地
+      let constructionSite = this.pos.findInRange(FIND_MY_CONSTRUCTION_SITES, 3)
+      if (constructionSite && constructionSite.length > 0) this.build(constructionSite[0])
+      // 没有建筑工地就创建一个
+      else this.pos.createConstructionSite(STRUCTURE_CONTAINER)
+    }
     // 自己身上没有资源了
     return this.store[RESOURCE_ENERGY] <= 0
   }

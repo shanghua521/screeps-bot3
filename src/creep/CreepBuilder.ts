@@ -38,12 +38,23 @@ export default class CreepBuilder extends BaseCreep {
     let source: any
     // 先去其他资源取，如果都没资源，去 storage 拿
     if (allSource.length > 0) {
-      source = this.pos.findClosestByPath(allSource)
+      // 如果有
+      source = this.pos.findClosestByRange(allSource)
+      // if (source instanceof StructureContainer) {
+      //   let surplusEnergy = source.store.getUsedCapacity(RESOURCE_ENERGY)
+      //   if (surplusEnergy - this.store.getFreeCapacity() < 200) {
+      //     _.remove(this.myRoom.allSource, _source => _source == source)
+      //   }
+      // }
+      if (this.room.storage && this.room.storage.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+        source = this.pos.findClosestByRange([source, this.room.storage])
+      }
     } else {
       if (this.room.storage && this.room.storage.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
         source = this.room.storage
       }
     }
+
 
     if (source && this.withdraw(source, RESOURCE_ENERGY) == ERR_NOT_IN_RANGE) this.moveTo(source)
     return this.store.getFreeCapacity() <= 0
@@ -67,7 +78,7 @@ export default class CreepBuilder extends BaseCreep {
     }
     let controller = this.myRoom.controller;
     if (controller && this.upgradeController(controller) == ERR_NOT_IN_RANGE) {
-      this.goTo(controller.pos)
+      this.goTo(controller.pos,3)
     }
     // 自己身上的能量没有了，返回 true（切换至 source 阶段）
     return this.store[RESOURCE_ENERGY] <= 0

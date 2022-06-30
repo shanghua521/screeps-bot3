@@ -15,10 +15,14 @@ export default class CreepOutDefend extends BaseCreep {
   }
 
   public target() {
-    var hostiles = this.myRoom.find(FIND_HOSTILE_CREEPS);
+    var hostiles = []
+    var hostileCreeps = this.myRoom.find(FIND_HOSTILE_CREEPS);
+    var hostilesStructures = this.myRoom.find(FIND_HOSTILE_STRUCTURES)
+    hostiles.push(...hostileCreeps)
+    hostiles.push(...hostilesStructures)
     if (hostiles.length > 0) {
-      let hostile = hostiles[0]
-      if (this.rangedAttack(hostile) == ERR_NOT_IN_RANGE) this.moveTo(hostile)
+      let hostile = this.pos.findClosestByRange(hostiles)
+      if (this.rangedAttack(hostile) == ERR_NOT_IN_RANGE || this.isOnEdge()) this.moveTo(hostile)
       return false
     }
     if (this.hits < this.hitsMax) {
@@ -37,7 +41,8 @@ export default class CreepOutDefend extends BaseCreep {
   }
 
   public work() {
-    if (!this.isInRightRoom()) {
+    if (this.myRoom.name != this.toRoomName) {
+      this.moveTo(new RoomPosition(25, 25, this.toRoomName))
       return
     }
     // 如果正在工作
